@@ -1,0 +1,639 @@
+---
+title: "STATS506 Assignment 3"
+author: "Manning Wu"
+format: pdf
+---
+## Q1
+
+``` stata
+. do "/var/folders/9l/v77qk8hx3bd3340w4rt82j080000gn/T//SD64794.000000"
+
+. // set up
+. * save data as .dta since original data is filed as .XPT
+. import sasxport5 /Users/wumanning/Downloads/VIX_D.XPT, clear
+
+. save VIX_D, replace
+file VIX_D.dta saved
+
+. import sasxport5 /Users/wumanning/Downloads/DEMO_D.XPT, clear
+
+. save DEMO_D, replace
+file DEMO_D.dta saved
+
+```
+### (a)
+```stata
+. * import data again
+. use VIX_D, clear
+
+. * merge two files, and keep only records which matched
+. merge 1:1 seqn using DEMO_D, keep(matched)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             6,980  (_merge==3)
+    -----------------------------------------
+
+. * drop the new column being created due to the merge
+. drop _merge
+
+. * print out its total sample size
+. count
+  6,980
+```
+Obviously, total sample size is now 6980.
+
+### (b)
+
+```stata
+. * drop missing data
+. drop if ridageyr==.
+(0 observations deleted)
+
+. drop if viq220==.
+(433 observations deleted)
+
+. 
+. * generate a new column for setting age bracket 
+. generate agegroup = 0
+
+. * set agegroup = 0 if 0 <= age <= 9, and so on, until agegroup = 8 if 80 <= age <= 89
+. replace agegroup = 0 if 9 >= ridageyr & ridageyr >= 0
+(0 real changes made)
+
+. replace agegroup = 1 if 19 >= ridageyr & ridageyr >= 10
+(2,088 real changes made)
+
+. replace agegroup = 2 if 29 >= ridageyr & ridageyr >= 20
+(939 real changes made)
+
+. replace agegroup = 3 if 39 >= ridageyr & ridageyr >= 30
+(750 real changes made)
+
+. replace agegroup = 4 if 49 >= ridageyr & ridageyr >= 40
+(773 real changes made)
+
+. replace agegroup = 5 if 59 >= ridageyr & ridageyr >= 50
+(609 real changes made)
+
+. replace agegroup = 6 if 69 >= ridageyr & ridageyr >= 60
+(630 real changes made)
+
+. replace agegroup = 7 if 79 >= ridageyr & ridageyr >= 70
+(447 real changes made)
+
+. replace agegroup = 8 if 89 >= ridageyr & ridageyr >= 80
+(311 real changes made)
+
+. * change the row name of table (agegroup) to make it nicer.
+. label def agegrouplabel 0 "0-9" 1 "10-19" 2 "20-29" 3 "30-39" 4 "40-49" 5 "50-59" 6 "60-69" 7 "70-79" 8 "80-89"
+
+. label values agegroup agegrouplabel
+
+. 
+. * generate a new column for setting viq220
+. generate glass = 0
+
+. * set glass = 0 if wear glasses for distance
+. replace glass = 0 if viq220 == 1
+(0 real changes made)
+
+. * set glass = 1 if don't wear glasses for distance or don't know.
+. replace glass = 1 if viq220 == 2 | viq220 == 9
+(3,782 real changes made)
+
+. * change the column name of table (whether wear glasses or not) to make it nicer.
+. label def glasslabel 0 "yes" 1 "otherwise"
+
+. label values glass glasslabel
+
+. * change the column name of table to make it nicer.
+. label variable glass "Glasses/contact lenses worn for distance (y\n or don't know)" 
+
+. 
+. * create the table
+. tabulate agegroup glass, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+           |    Glasses/contact
+           |    lenses worn for
+           |   distance (y\n or
+           |      don't know)
+  agegroup |       yes  otherwise |     Total
+-----------+----------------------+----------
+     10-19 |       670      1,418 |     2,088 
+           |     32.09      67.91 |    100.00 
+-----------+----------------------+----------
+     20-29 |       306        633 |       939 
+           |     32.59      67.41 |    100.00 
+-----------+----------------------+----------
+     30-39 |       269        481 |       750 
+           |     35.87      64.13 |    100.00 
+-----------+----------------------+----------
+     40-49 |       286        487 |       773 
+           |     37.00      63.00 |    100.00 
+-----------+----------------------+----------
+     50-59 |       335        274 |       609 
+           |     55.01      44.99 |    100.00 
+-----------+----------------------+----------
+     60-69 |       392        238 |       630 
+           |     62.22      37.78 |    100.00 
+-----------+----------------------+----------
+     70-79 |       299        148 |       447 
+           |     66.89      33.11 |    100.00 
+-----------+----------------------+----------
+     80-89 |       208        103 |       311 
+           |     66.88      33.12 |    100.00 
+-----------+----------------------+----------
+     Total |     2,765      3,782 |     6,547 
+           |     42.23      57.77 |    100.00 
+
+```
+
+### (c)
+
+```stata
+. * To better fit the logistics regression (which response needs to be binary number), 
+. * I drop value = 9 (don't know) in viq220. And replace value = 0 if answer is no, 
+. * value. =1 if answer = yes.
+. drop if viq220 == 9
+(2 observations deleted)
+
+. replace viq220 = 0 if viq220 == 2
+(3,780 real changes made)
+
+. tabulate viq220
+
+Glasses/con |
+tact lenses |
+   worn for |
+   distance |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      3,780       57.75       57.75
+          1 |      2,765       42.25      100.00
+------------+-----------------------------------
+      Total |      6,545      100.00
+
+. 
+. * generate logistics regression 1
+. logit viq220 ridageyr, or
+
+Iteration 0:  Log likelihood = -4457.6265  
+Iteration 1:  Log likelihood = -4236.2351  
+Iteration 2:  Log likelihood = -4235.9433  
+Iteration 3:  Log likelihood = -4235.9433  
+
+Logistic regression                                     Number of obs =  6,545
+                                                        LR chi2(1)    = 443.37
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -4235.9433                             Pseudo R2     = 0.0497
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |    1.02498   .0012356    20.47   0.000     1.022561    1.027405
+       _cons |    .283379   .0151461   -23.59   0.000     .2551952    .3146755
+------------------------------------------------------------------------------
+Note: _cons estimates baseline odds.
+
+. * store this regression as model1
+. est store model1
+
+. 
+. * before generating logistics regression 2, drop missing data of predictors
+. drop if ridreth1==. // drop missing data
+(0 observations deleted)
+
+. drop if riagendr==.
+(0 observations deleted)
+
+. * generate logistics regression 2
+. logit viq220 i.ridageyr ridreth1 riagendr, or
+
+Iteration 0:  Log likelihood = -4457.6265  
+Iteration 1:  Log likelihood = -4138.3859  
+Iteration 2:  Log likelihood = -4136.8807  
+Iteration 3:  Log likelihood = -4136.8805  
+
+Logistic regression                                     Number of obs =  6,545
+                                                        LR chi2(6)    = 641.49
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -4136.8805                             Pseudo R2     = 0.0720
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |   1.022831   .0012912    17.88   0.000     1.020303    1.025365
+             |
+    ridreth1 |
+          2  |   1.169203    .192081     0.95   0.341     .8473273    1.613349
+          3  |   1.952149   .1366952     9.55   0.000     1.701803    2.239322
+          4  |    1.29936   .0995052     3.42   0.001     1.118264    1.509783
+          5  |   1.917442   .2596352     4.81   0.000     1.470495    2.500236
+             |
+    riagendr |    1.65217   .0875831     9.47   0.000     1.489127    1.833064
+       _cons |   .0964476   .0107636   -20.96   0.000     .0774992    .1200289
+------------------------------------------------------------------------------
+Note: _cons estimates baseline odds.
+
+
+. * store regression as model2
+. est store model2
+
+. 
+. * before generating logistics regression 3, drop missing data for predictor
+. drop if indfmpir==. // drop missing data
+(298 observations deleted)
+
+. * generate logistics regression 3
+. logit viq220 ridageyr i.ridreth1 riagendr indfmpir, or
+
+Iteration 0:  Log likelihood = -4259.5533  
+Iteration 1:  Log likelihood = -3948.3256  
+Iteration 2:  Log likelihood = -3946.9043  
+Iteration 3:  Log likelihood = -3946.9041  
+
+Logistic regression                                     Number of obs =  6,247
+                                                        LR chi2(7)    = 625.30
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -3946.9041                             Pseudo R2     = 0.0734
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |   1.022436    .001324    17.14   0.000     1.019845    1.025035
+             |
+    ridreth1 |
+          2  |   1.123021   .1889653     0.69   0.490     .8075333    1.561764
+          3  |   1.651244   .1240886     6.67   0.000     1.425098    1.913277
+          4  |   1.230456   .0974736     2.62   0.009     1.053503     1.43713
+          5  |   1.703572   .2387583     3.80   0.000     1.294384    2.242114
+             |
+    riagendr |   1.675767   .0910025     9.51   0.000      1.50657    1.863967
+    indfmpir |   1.120301   .0198376     6.42   0.000     1.082087    1.159865
+       _cons |   .0794656   .0095891   -20.99   0.000     .0627285    .1006685
+------------------------------------------------------------------------------
+Note: _cons estimates baseline odds.
+
+. * store regression as model3
+. est store model3
+
+. 
+. * generate the table
+. esttab model1 model2 model3, ///
+>   eform  pr2 aic ///
+>   title("Regression Model Comparison") ///
+>   collabels("Model 1" "Model 2" "Model 3")
+
+Regression Model Comparison
+------------------------------------------------------------
+                      (1)             (2)             (3)   
+                   viq220          viq220          viq220   
+                  Model 1         Model 1         Model 1   
+------------------------------------------------------------
+viq220                                                      
+ridageyr            1.025***        1.023***        1.022***
+                  (20.47)         (17.88)         (17.14)   
+
+1.ridreth1                              1               1   
+                                      (.)             (.)   
+
+2.ridreth1                          1.169           1.123   
+                                   (0.95)          (0.69)   
+
+3.ridreth1                          1.952***        1.651***
+                                   (9.55)          (6.67)   
+
+4.ridreth1                          1.299***        1.230** 
+                                   (3.42)          (2.62)   
+
+5.ridreth1                          1.917***        1.704***
+                                   (4.81)          (3.80)   
+
+riagendr                            1.652***        1.676***
+                                   (9.47)          (9.51)   
+
+indfmpir                                            1.120***
+                                                   (6.42)   
+------------------------------------------------------------
+N                    6545            6545            6247   
+pseudo R-sq         0.050           0.072           0.073   
+AIC                8475.9          8287.8          7909.8   
+------------------------------------------------------------
+Exponentiated coefficients; t statistics in parentheses
+* p<0.05, ** p<0.01, *** p<0.001
+
+```
+
+### (d)
+
+```stata
+. logit viq220 ridageyr ridreth1 riagendr indfmpir, or
+
+
+Iteration 0:  Log likelihood = -4259.5533  
+Iteration 1:  Log likelihood = -3948.3256  
+Iteration 2:  Log likelihood = -3946.9043  
+Iteration 3:  Log likelihood = -3946.9041  
+
+Logistic regression                                     Number of obs =  6,247
+                                                        LR chi2(7)    = 625.30
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -3946.9041                             Pseudo R2     = 0.0734
+
+------------------------------------------------------------------------------
+      viq220 | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    ridageyr |   1.022436    .001324    17.14   0.000     1.019845    1.025035
+             |
+    ridreth1 |
+          2  |   1.123021   .1889653     0.69   0.490     .8075333    1.561764
+          3  |   1.651244   .1240886     6.67   0.000     1.425098    1.913277
+          4  |   1.230456   .0974736     2.62   0.009     1.053503     1.43713
+          5  |   1.703572   .2387583     3.80   0.000     1.294384    2.242114
+             |
+    riagendr |   1.675767   .0910025     9.51   0.000      1.50657    1.863967
+    indfmpir |   1.120301   .0198376     6.42   0.000     1.082087    1.159865
+       _cons |   .0794656   .0095891   -20.99   0.000     .0627285    .1006685
+------------------------------------------------------------------------------
+Note: _cons estimates baseline odds.
+
+. prtest viq220, by(riagendr)
+
+Two-sample test of proportions                     1: Number of obs =     3053
+                                                   2: Number of obs =     3194
+------------------------------------------------------------------------------
+       Group |       Mean   Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+           1 |   .3714379   .0087449                      .3542983    .3885776
+           2 |   .4762054   .0088371                       .458885    .4935258
+-------------+----------------------------------------------------------------
+        diff |  -.1047675   .0124325                     -.1291347   -.0804002
+             |  under H0:   .0125122    -8.37   0.000
+------------------------------------------------------------------------------
+        diff = prop(1) - prop(2)                                  z =  -8.3732
+    H0: diff = 0
+
+    Ha: diff < 0                 Ha: diff != 0                 Ha: diff > 0
+ Pr(Z < z) = 0.0000         Pr(|Z| > |z|) = 0.0000          Pr(Z > z) = 1.0000
+
+. 
+end of do-file
+
+. 
+```
+
+Comment: 
+
+According to the table in (c), we can easy find that the odds of men and women being wears of glasess/contact lenses for distance vision differs since the predictor `riagendr` in `model3` has three stars, that is, really significant.
+
+Then, we do `prtest` to test the proportion of wearers of glasses/contact lenses for distance vision differs between men and women, where we get the conclusion that prop(men) > prop(women) has p-value approximately to 1, that is, the proportion differs a lot between men and women. The result can also be shown by abs(z) is large in `prtest`, which makes $H_0: prop(female) - prop(male) = 0 $ to be rejected.
+
+According to the properties of odd ratio (or), if or > 1, then the exposure associated with higher odds of outcome (female). Since the coefficient for `riagendr` is the odds ratio between the female group and male group: 1.676, we can know that the odds for female are about 67.6% higher than the odds for males. That is, a person who changes from male to female, holding all other predictors constant, will increase 68% probability to wear glasses.
+
+#### Citation for Stata: 
+https://www.stata.com/manuals/rtabulatetwoway.pdf#rtabulatetwoway
+
+https://www.stata.com/manuals/rprtest.pdf
+
+## Q2
+
+### Set up
+
+```{r}
+#| warning: false
+# Packages
+library(DBI)     # For interfacing with a database
+library(RMySQL)
+library(RSQLite)
+library(tidyverse)
+# Import the SQLite database of the sakila data
+sakila <- dbConnect(RSQLite::SQLite(), "/Users/wumanning/Downloads/sakila_master.db")
+dbListTables(sakila)
+```
+
+### (a)
+
+```{r}
+dbGetQuery(sakila, "
+SELECT l.name, COUNT(*) AS film_count
+  FROM film AS f
+       INNER JOIN language AS l ON l.language_id = f.language_id
+       GROUP BY l.name
+       ORDER BY film_count DESC
+       LIMIT 2
+")
+```
+### (b)
+
+#### 1. First way
+
+```{r}
+# get the dataframe from inner joining film_category with category 
+# based on the column `category_id`
+df_category <- dbGetQuery(sakila, "
+SELECT fc.film_id, c.name AS category_name
+  FROM film_category AS fc
+       INNER JOIN category AS c ON c.category_id = fc.category_id
+")
+```
+
+```{r}
+# make the dataframe generated by SQL group by `category_name`.
+# only pick `film_id` and `category_name` to be columns in dataframe for convenience
+df_result_b <- count(df_category[c("film_id", "category_name")] %>% 
+                       group_by(category_name))
+# arrange the dataframe in descending order based on the number of each category
+df_result_b <- df_result_b %>% arrange(desc(n))
+# output the genre of movie which has the largest ammount.
+print(paste("The most common genre of movie in the data is", df_result_b["category_name"][1,]))
+print(paste("The number of movies of this genre is", df_result_b["n"][1,]))
+```
+
+#### 2. Second way
+```{r}
+dbGetQuery(sakila, "
+SELECT c.name, COUNT(*) AS film_count
+  FROM film_category AS fc
+       INNER JOIN category AS c ON c.category_id = fc.category_id
+       GROUP BY c.name
+       ORDER BY film_count DESC
+       LIMIT 1
+")
+```
+
+### (c)
+
+#### 1. First way
+
+```{r}
+# get the dataframe from linking customer and country based on the column `address_id`,
+# `city_id` and `country_id`.
+df_country <- dbGetQuery(sakila, "
+SELECT *
+  FROM country
+       INNER JOIN
+       (SELECT *
+          FROM city 
+               INNER JOIN
+               (SELECT *
+                  FROM address
+                       INNER JOIN customer
+                       ON customer.address_id = address.address_id
+               ) AS ca ON city.city_id = ca.city_id
+       ) AS cc ON country.country_id = cc.country_id
+")
+```
+
+```{r}
+# make the dataframe generated by SQL group by `country`.
+# only pick `customer_id` and `country` to be columns in dataframe for convenience
+df_result_c <- count(df_country[c("customer_id", "country")] %>% 
+                       group_by(country)) %>% 
+  filter(n == 9) # only pick the country that has 9 customers
+# output the result
+print(paste("The country has exactly 9 customers is", df_result_c["country"]))
+```
+
+#### 2. Second way
+
+```{r}
+dbGetQuery(sakila, "
+SELECT country
+  FROM
+  (SELECT country, COUNT(country) AS count
+    FROM country
+         INNER JOIN
+         (SELECT *
+            FROM city 
+                 INNER JOIN
+                 (SELECT *
+                    FROM address
+                         INNER JOIN customer
+                         ON customer.address_id = address.address_id
+                 ) AS ca ON city.city_id = ca.city_id
+         ) AS cc ON country.country_id = cc.country_id
+    GROUP BY country
+    HAVING count == 9)
+")
+ 
+```
+
+## Q3
+
+### Set up
+```{r}
+# import the dataset
+df_3 <- read.csv("/Users/wumanning/Downloads/us-500.csv", sep = ",")
+```
+
+### (a)
+
+```{r}
+email <- df_3["email"]
+# calculate the proportion of email that ended by `.net`
+proportion_3a <- length(grep(".net$", email[,1]))/nrow(email)
+print(paste("The proportion of email addresses are hosted at a domain with TLD '.net' is", proportion_3a))
+```
+
+### (b)
+
+```{r}
+# pick the email that contains elements exclude `A-Za-z0-9@.`
+pattern_1 <- "[^A-Za-z0-9@.]"
+index_3b <- grep(pattern_1, email[,1])
+# count its amount as `num_1`
+num_1 <- length(index_3b)
+
+# pick the email that contains only `A-Za-z0-9@.`
+email_3b_exclude <- email[-index_3b,]
+
+# choose the email from the list of emails which only contains `A-Za-z0-9@.` that has more than 1 `.`
+pattern_2 <- "\\."
+dot_matches <- gregexpr(pattern_2, email_3b_exclude)
+# count its amount as `num_2`
+num_2 <- sum(lengths((dot_matches)) > 1)
+
+# sum up two conditions above (`num_1` + `num_2`)
+proportion_3b <- (num_1 + num_2)/nrow(email)
+print(paste("The proportion of email addresses have at least one non alphanumeric character is", proportion_3b))
+```
+
+### (c)
+
+```{r}
+# merge two columns of phone
+phone_1 <- df_3["phone1"][,1]
+phone_2 <- df_3["phone2"][,1]
+phone <- c(phone_1, phone_2)
+
+# use the sub() function to select the contents before the first `-`
+phone_code <- sub("-.*", "", phone)
+
+# create a dataframe to save the area code from phone number and also group it up.
+df_phoneCode <- count(as.data.frame(phone_code) %>% group_by(phone_code))
+# arrange the dataframe in descending order based on the number of each area code
+# pick the first area code as the most common one
+result_3c <- (df_phoneCode %>% arrange(desc(n)))["phone_code"][1,]
+print(paste("The most common area code amongst all phone numbers is", result_3c))
+```
+
+### (d)
+
+```{r}
+address <- df_3["address"]
+# pick the address with `#` as `address_with_apt` for convenience.
+address_with_apt <- address[,1][grep("#", address[,1])]
+# pick the value after `#` as apt_number
+apt_number <- sub(".*#", "", address_with_apt)
+apt_number <- as.numeric(apt_number)
+```
+
+```{r}
+#| warning: false
+# generate the histogram plot
+ggplot(data.frame(x = log(apt_number)), aes(x = x)) +
+  geom_histogram(binwidth = 0.25, fill = "purple") +
+  labs(title = "Log of the apartment numbers", x = "log(apt number)", y = "frequency")
+```
+
+### (e)
+
+```{r}
+# count the total number of apartment number for following calculation
+num_apt <- length(apt_number)
+# pick the leading digit of apartment number
+apt_number_leadingDigit <- as.numeric(substr(apt_number, 1, 1))
+# save the leading digit as dataframe for convenience for `group_by`
+df_leadingDigit <- count(as.data.frame(apt_number_leadingDigit) %>% group_by(apt_number_leadingDigit))
+# output the proportion
+df_leadingDigit %>% mutate(propotion = n/num_apt)
+```
+
+Obviously, the apartment number is fake data since the proportion from 1-9 is not like an exponential distribution as Benford's Law shows
+
+### (f)
+
+```{r}
+# pick the address begins with digits as `address_with_st` for convenience.
+address_with_st <- address[,1][grep("^[0-9]", address[,1])]
+# pick such digits
+st_number <- sub("^([0-9]+).*", "\\1", address_with_st)
+# count the total number of street number for following calculation
+num_st <- length(st_number)
+# pick the last digit of street number
+st_number_lastDigit <- as.numeric(substr(st_number, nchar(st_number), nchar(st_number)))
+# save the last digit as dataframe for convenience for `group_by`
+df_lastDigit <- count(as.data.frame(st_number_lastDigit) %>% group_by(st_number_lastDigit))
+# output the proportion
+df_lastDigit %>% mutate(propotion = n/num_st)
+```
+
+Obviously, the street number is fake data since the proportion from 0-9 is not like an exponential distribution as Benford's Law shows.
